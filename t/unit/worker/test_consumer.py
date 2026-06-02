@@ -1222,6 +1222,14 @@ class test_Agent:
 
 class test_Mingle:
 
+    def test_include_if_disabled(self):
+        c = Mock()
+        c.app.connection_for_read = _amqp_connection()
+        mingle = Mingle(c, without_mingle=True)
+        with patch('celery.worker.consumer.mingle.info') as info:
+            assert not mingle.include_if(c)
+            info.assert_called_once_with('mingle: disabled')
+
     def test_start_no_replies(self):
         c = Mock()
         c.app.connection_for_read = _amqp_connection()

@@ -60,6 +60,7 @@ BANNER = """\
 .> results:     {results}
 .> concurrency: {concurrency}
 .> task events: {events}
+.> mingle:      {mingle}
 
 [queues]
 {queues}
@@ -228,6 +229,7 @@ class Worker(WorkController):
         events = 'ON'
         if not self.task_events:
             events = 'OFF (enable -E to monitor tasks in this worker)'
+        mingle = 'OFF (disabled by --without-mingle)' if self.options.get('without_mingle') else 'ON'
 
         banner = BANNER.format(
             app=appr,
@@ -239,6 +241,7 @@ class Worker(WorkController):
             concurrency=concurrency,
             platform=safe_str(_platform.platform()),
             events=events,
+            mingle=mingle,
             queues=app.amqp.queues.format(indent=0, indent_first=False),
         ).splitlines()
 

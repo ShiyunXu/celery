@@ -25,9 +25,15 @@ class Mingle(bootsteps.StartStopStep):
     compatible_transports = {'amqp', 'redis', 'gcpubsub'}
 
     def __init__(self, c, without_mingle=False, **kwargs):
+        self.without_mingle = without_mingle
         self.enabled = not without_mingle and self.compatible_transport(c.app)
         super().__init__(
             c, without_mingle=without_mingle, **kwargs)
+
+    def include_if(self, parent):
+        if self.without_mingle:
+            info('mingle: disabled')
+        return self.enabled
 
     def compatible_transport(self, app):
         with app.connection_for_read() as conn:
