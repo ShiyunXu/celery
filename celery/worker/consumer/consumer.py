@@ -658,6 +658,15 @@ class Consumer:
         self.on_task_request(task)
         self.qos.decrement_eventually()
 
+    def iter_eta_schedule(self):
+        """Yield timer entries currently waiting on ETA/countdown."""
+        for waiting in self.timer.schedule.queue:
+            try:
+                request = waiting.entry.args[0]
+            except (AttributeError, IndexError, TypeError):
+                continue
+            yield waiting, request
+
     def _message_report(self, body, message):
         return MESSAGE_REPORT.format(dump_body(message, body),
                                      safe_repr(message.content_type),

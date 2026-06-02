@@ -147,6 +147,10 @@ class test_inspect:
         self.inspect.scheduled()
         self.assert_broadcast_called('scheduled')
 
+    def test_eta(self):
+        self.inspect.eta()
+        self.assert_broadcast_called('eta')
+
     def test_reserved(self):
         self.inspect.reserved()
         self.assert_broadcast_called('reserved')

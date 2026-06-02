@@ -167,6 +167,21 @@ class Inspect:
         """
         return self._request('scheduled')
 
+    def eta(self):
+        """Return list of tasks waiting on ETA/countdown.
+
+        Returns:
+            Dict: Dictionary ``{HOSTNAME: [TASK_ETA_INFO,...]}``.
+
+        Here is the list of ``TASK_ETA_INFO`` fields:
+
+        * ``id`` - id of the task.
+        * ``name`` - name of the task.
+        * ``eta`` - scheduled time for task execution as string in ISO 8601 format.
+        * ``queue`` - queue/routing key the task was consumed from.
+        """
+        return self._request('eta')
+
     def reserved(self, safe=None):
         """Return list of currently reserved tasks, not including scheduled/active.
 

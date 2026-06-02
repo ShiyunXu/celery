@@ -411,22 +411,39 @@ def stats(state, **kwargs):
 @inspect_command(alias='dump_schedule')
 def scheduled(state, **kwargs):
     """List of currently scheduled ETA/countdown tasks."""
-    return list(_iter_schedule_requests(state.consumer.timer))
+    return list(_iter_schedule_requests(state.consumer))
 
 
-def _iter_schedule_requests(timer):
-    for waiting in timer.schedule.queue:
-        try:
-            arg0 = waiting.entry.args[0]
-        except (IndexError, TypeError):
-            continue
-        else:
-            if isinstance(arg0, Request):
-                yield {
-                    'eta': arg0.eta.isoformat() if arg0.eta else None,
-                    'priority': waiting.priority,
-                    'request': arg0.info(),
-                }
+@inspect_command(alias='dump_eta')
+def eta(state, **kwargs):
+    """List of tasks currently waiting on ETA/countdown."""
+    return list(_iter_eta_requests(state.consumer))
+
+
+def _iter_schedule_requests(consumer):
+    for waiting, request in _iter_eta_schedule(consumer):
+        yield {
+            'eta': request.eta.isoformat() if request.eta else None,
+            'priority': waiting.priority,
+            'request': request.info(),
+        }
+
+
+def _iter_eta_requests(consumer):
+    for _, request in _iter_eta_schedule(consumer):
+        delivery_info = request.delivery_info or {}
+        yield {
+            'id': request.id,
+            'name': request.name,
+            'eta': request.eta.isoformat() if request.eta else None,
+            'queue': delivery_info.get('routing_key'),
+        }
+
+
+def _iter_eta_schedule(consumer):
+    for waiting, request in consumer.iter_eta_schedule():
+        if isinstance(request, Request):
+            yield waiting, request
 
 
 @inspect_command(alias='dump_reserved')

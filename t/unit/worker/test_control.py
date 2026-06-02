@@ -449,6 +449,32 @@ class test_ControlPanel:
             datetime.now() + timedelta(seconds=10))
         assert panel.handle('dump_schedule')
 
+    def test_dump_eta(self):
+        consumer = Consumer(self.app)
+        panel = self.create_panel(consumer=consumer)
+        assert panel.handle('dump_eta') == []
+        r = Request(
+            self.TaskMessage(self.mytask.name, 'CAFEBABE'),
+            app=self.app,
+        )
+        r._delivery_info['routing_key'] = 'eta-queue'
+        consumer.timer.schedule.enter_at(
+            consumer.timer.Entry(lambda x: x, (r,)),
+            datetime.now() + timedelta(seconds=10),
+        )
+        consumer.timer.schedule.enter_at(
+            consumer.timer.Entry(lambda x: x, (object(),)),
+            datetime.now() + timedelta(seconds=10),
+        )
+        response = panel.handle('dump_eta')
+        assert len(response) == 1
+        assert response[0] == {
+            'id': r.id,
+            'name': self.mytask.name,
+            'eta': r.eta.isoformat() if r.eta else None,
+            'queue': 'eta-queue',
+        }
+
     def test_dump_reserved(self):
         consumer = Consumer(self.app)
         req = Request(
