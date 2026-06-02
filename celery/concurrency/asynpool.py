@@ -516,8 +516,15 @@ class AsynPool(_pool.Pool):
         sentinel_poll = getattr(proc, '_sentinel_poll', None)
         if sentinel_poll is not None:
             proc._sentinel_poll = None
-            hub.remove(sentinel_poll)
-            os.close(sentinel_poll)
+            try:
+                hub.remove(sentinel_poll)
+            finally:
+                try:
+                    os.close(sentinel_poll)
+                except OSError:
+                    # Ignore EBADF and similar errors: the fd may have
+                    # already been closed by a concurrent code path.
+                    pass
 
     def register_with_event_loop(self, hub):
         """Register the async pool with the current event loop."""
@@ -685,6 +692,9 @@ class AsynPool(_pool.Pool):
 
         def on_process_down(proc):
             """Called when a worker process exits."""
+            # Always untrack the sentinel fd to prevent stale file descriptors,
+            # regardless of whether the process was marked as dead (partial write).
+            self._untrack_child_process(proc, hub)
             if getattr(proc, 'dead', None):
                 return
             process_flush_queues(proc)
@@ -701,7 +711,6 @@ class AsynPool(_pool.Pool):
             )
             if inq:
                 busy_workers.discard(inq)
-            self._untrack_child_process(proc, hub)
             waiting_to_start.discard(proc)
             self._active_writes.discard(proc.inqW_fd)
             remove_writer(proc.inq._writer)
@@ -1331,7 +1340,13 @@ class AsynPool(_pool.Pool):
             if queue:
                 for sock in (queue._reader, queue._writer):
                     if not sock.closed:
-                        self.hub_remove(sock)
+                        try:
+                            self.hub_remove(sock)
+                        except Exception:
+                            # Hub removal errors (e.g., fd not registered,
+                            # epoll unregister failure) are non-fatal during
+                            # teardown; the fd must still be closed at OS level.
+                            pass
                         try:
                             sock.close()
                         except OSError:
