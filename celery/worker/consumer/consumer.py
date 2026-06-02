@@ -661,9 +661,13 @@ class Consumer:
     def iter_eta_schedule(self):
         """Yield ``(waiting, request)`` pairs for ETA/countdown timer entries."""
         for waiting in self.timer.schedule.queue:
+            entry = getattr(waiting, 'entry', None)
+            args = getattr(entry, 'args', None)
+            if not args:
+                continue
             try:
-                request = waiting.entry.args[0]
-            except (AttributeError, IndexError, TypeError):
+                request = args[0]
+            except (IndexError, TypeError):
                 continue
             yield waiting, request
 

@@ -411,7 +411,7 @@ def stats(state, **kwargs):
 @inspect_command(alias='dump_schedule')
 def scheduled(state, **kwargs):
     """List of currently scheduled ETA/countdown tasks."""
-    return list(_iter_schedule_requests(state.consumer))
+    return list(_iter_schedule_requests(state.consumer.timer))
 
 
 @inspect_command(alias='dump_eta')
@@ -420,8 +420,8 @@ def eta(state, **kwargs):
     return list(_iter_eta_requests(state.consumer))
 
 
-def _iter_schedule_requests(consumer):
-    for waiting, request in _iter_eta_schedule(consumer):
+def _iter_schedule_requests(source):
+    for waiting, request in _iter_eta_schedule(source):
         yield {
             'eta': request.eta.isoformat() if request.eta else None,
             'priority': waiting.priority,
@@ -429,8 +429,8 @@ def _iter_schedule_requests(consumer):
         }
 
 
-def _iter_eta_requests(consumer):
-    for _, request in _iter_eta_schedule(consumer):
+def _iter_eta_requests(source):
+    for _, request in _iter_eta_schedule(source):
         delivery_info = request.delivery_info or {}
         yield {
             'id': request.id,
@@ -440,10 +440,28 @@ def _iter_eta_requests(consumer):
         }
 
 
-def _iter_eta_schedule(consumer):
-    for waiting, request in consumer.iter_eta_schedule():
+def _iter_eta_schedule(source):
+    if hasattr(source, 'iter_eta_schedule'):
+        iterator = source.iter_eta_schedule()
+    else:
+        iterator = _iter_timer_schedule(source)
+
+    for waiting, request in iterator:
         if isinstance(request, Request):
             yield waiting, request
+
+
+def _iter_timer_schedule(timer):
+    for waiting in timer.schedule.queue:
+        entry = getattr(waiting, 'entry', None)
+        args = getattr(entry, 'args', None)
+        if not args:
+            continue
+        try:
+            request = args[0]
+        except (IndexError, TypeError):
+            continue
+        yield waiting, request
 
 
 @inspect_command(alias='dump_reserved')
