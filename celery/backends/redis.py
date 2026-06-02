@@ -582,6 +582,7 @@ class RedisBackend(BaseKeyValueStoreBackend, AsyncBackendMixin):
             group_index = '+inf'
 
         client = self.client
+        gkey = self.get_key_for_group(gid)
         jkey = self.get_key_for_group(gid, '.j')
         tkey = self.get_key_for_group(gid, '.t')
         skey = self.get_key_for_group(gid, '.s')
@@ -597,7 +598,8 @@ class RedisBackend(BaseKeyValueStoreBackend, AsyncBackendMixin):
                 pipeline = pipeline \
                     .expire(jkey, self.expires) \
                     .expire(tkey, self.expires) \
-                    .expire(skey, self.expires)
+                    .expire(skey, self.expires) \
+                    .expire(gkey, self.expires)
 
             _, readycount, totaldiff, chord_size_bytes = pipeline.execute()[:4]
 
@@ -656,7 +658,9 @@ class RedisBackend(BaseKeyValueStoreBackend, AsyncBackendMixin):
                                 .delete(jkey) \
                                 .delete(tkey) \
                                 .delete(skey) \
+                                .delete(gkey) \
                                 .execute()
+                        self._cache.pop(gid, None)
             except ChordError as exc:
                 logger.exception('Chord %r raised: %r', request.group, exc)
                 return self.chord_error_from_stack(callback, exc)

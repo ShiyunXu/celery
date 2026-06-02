@@ -969,6 +969,26 @@ class GroupResult(ResultSet):
         """Remove this result if it was previously saved."""
         (backend or self.app.backend).delete_group(self.id)
 
+    def backend_expire(self, timeout=None, backend=None):
+        """Refresh the TTL of this saved group result in the backend.
+
+        This should be called during long chord executions to prevent
+        the stored group metadata from expiring before the chord completes.
+
+        Arguments:
+            timeout (int): Time in seconds until the group result expires.
+                Defaults to the backend's configured ``result_expires``.
+            backend (Backend): The result backend to use.
+                Defaults to the backend of the app.
+        """
+        backend = backend or self.app.backend
+        if timeout is None:
+            timeout = getattr(backend, 'expires', None)
+        if timeout:
+            backend.expire(
+                backend.get_key_for_group(self.id), timeout
+            )
+
     def __reduce__(self):
         return self.__class__, self.__reduce_args__()
 

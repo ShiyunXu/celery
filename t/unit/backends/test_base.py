@@ -1386,6 +1386,19 @@ class test_KeyValueStoreBackend:
             assert isinstance(exc, ChordError)
             assert 'Dependency culprit raised' in str(exc)
 
+    def test_chord_part_return_partial_refreshes_group_key_ttl(self):
+        """When chord is not yet complete, GroupResult key TTL is refreshed."""
+        with self._chord_part_context(self.b) as (task, deps, _):
+            # Make incr return less than the chord size so we hit the else branch
+            self.b.incr.return_value = 5  # size is 10, so not yet complete
+            self.b.expires = 300
+            self.b.on_chord_part_return(task.request, 'SUCCESS', 10)
+            # Verify expire was called for both the chord counter key and
+            # the GroupResult key (to prevent them from expiring prematurely)
+            gid = task.request.group
+            group_key = self.b.get_key_for_group(gid)
+            self.b.expire.assert_any_call(group_key, 300)
+
     def test_restore_group_from_json(self):
         b = KVBackend(serializer='json', app=self.app)
         g = self.app.GroupResult(

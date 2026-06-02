@@ -1166,12 +1166,16 @@ class test_RedisBackend_chords_simple(basetest_RedisBackend):
             assert self.b.client.zadd.call_count
             self.b.client.zadd.reset_mock()
         assert self.b.client.zrangebyscore.call_count
+        gkey = self.b.get_key_for_group('group_id')
         jkey = self.b.get_key_for_group('group_id', '.j')
         tkey = self.b.get_key_for_group('group_id', '.t')
         skey = self.b.get_key_for_group('group_id', '.s')
-        self.b.client.delete.assert_has_calls([call(jkey), call(tkey), call(skey)])
+        self.b.client.delete.assert_has_calls(
+            [call(jkey), call(tkey), call(skey), call(gkey)]
+        )
         self.b.client.expire.assert_has_calls([
-            call(jkey, 86400), call(tkey, 86400), call(skey, 86400),
+            call(jkey, 86400), call(tkey, 86400),
+            call(skey, 86400), call(gkey, 86400),
         ])
 
     def test_on_chord_part_return__unordered(self):
@@ -1187,11 +1191,16 @@ class test_RedisBackend_chords_simple(basetest_RedisBackend):
             assert self.b.client.rpush.call_count
             self.b.client.rpush.reset_mock()
         assert self.b.client.lrange.call_count
+        gkey = self.b.get_key_for_group('group_id')
         jkey = self.b.get_key_for_group('group_id', '.j')
         tkey = self.b.get_key_for_group('group_id', '.t')
-        self.b.client.delete.assert_has_calls([call(jkey), call(tkey)])
+        skey = self.b.get_key_for_group('group_id', '.s')
+        self.b.client.delete.assert_has_calls(
+            [call(jkey), call(tkey), call(skey), call(gkey)]
+        )
         self.b.client.expire.assert_has_calls([
             call(jkey, 86400), call(tkey, 86400),
+            call(skey, 86400), call(gkey, 86400),
         ])
 
     def test_on_chord_part_return__ordered(self):
@@ -1207,11 +1216,16 @@ class test_RedisBackend_chords_simple(basetest_RedisBackend):
             assert self.b.client.zadd.call_count
             self.b.client.zadd.reset_mock()
         assert self.b.client.zrangebyscore.call_count
+        gkey = self.b.get_key_for_group('group_id')
         jkey = self.b.get_key_for_group('group_id', '.j')
         tkey = self.b.get_key_for_group('group_id', '.t')
-        self.b.client.delete.assert_has_calls([call(jkey), call(tkey)])
+        skey = self.b.get_key_for_group('group_id', '.s')
+        self.b.client.delete.assert_has_calls(
+            [call(jkey), call(tkey), call(skey), call(gkey)]
+        )
         self.b.client.expire.assert_has_calls([
             call(jkey, 86400), call(tkey, 86400),
+            call(skey, 86400), call(gkey, 86400),
         ])
 
     def test_on_chord_part_return_no_expiry(self):
@@ -1360,7 +1374,7 @@ class test_RedisBackend_chords_simple(basetest_RedisBackend):
             self.b.client.pipeline = ContextMock()
             raise_on_second_call(self.b.client.pipeline, ChordError())
             self.b.client.pipeline.return_value.zadd().zcount().get().get().expire(
-            ).expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6)
+            ).expire().expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6, 7)
             task = self.app._tasks['add'] = Mock(name='add_task')
             self.b.on_chord_part_return(request, states.SUCCESS, 10)
             task.backend.fail_from_current_stack.assert_called_with(
@@ -1376,7 +1390,7 @@ class test_RedisBackend_chords_simple(basetest_RedisBackend):
             self.b.client.pipeline = ContextMock()
             raise_on_second_call(self.b.client.pipeline, ChordError())
             self.b.client.pipeline.return_value.rpush().llen().get().get().expire(
-            ).expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6)
+            ).expire().expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6, 7)
             task = self.app._tasks['add'] = Mock(name='add_task')
             self.b.on_chord_part_return(request, states.SUCCESS, 10)
             task.backend.fail_from_current_stack.assert_called_with(
@@ -1392,7 +1406,7 @@ class test_RedisBackend_chords_simple(basetest_RedisBackend):
             self.b.client.pipeline = ContextMock()
             raise_on_second_call(self.b.client.pipeline, ChordError())
             self.b.client.pipeline.return_value.zadd().zcount().get().get().expire(
-            ).expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6)
+            ).expire().expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6, 7)
             task = self.app._tasks['add'] = Mock(name='add_task')
             self.b.on_chord_part_return(request, states.SUCCESS, 10)
             task.backend.fail_from_current_stack.assert_called_with(
@@ -1404,7 +1418,7 @@ class test_RedisBackend_chords_simple(basetest_RedisBackend):
             self.b.client.pipeline = ContextMock()
             raise_on_second_call(self.b.client.pipeline, RuntimeError())
             self.b.client.pipeline.return_value.zadd().zcount().get().get().expire(
-            ).expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6)
+            ).expire().expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6, 7)
             task = self.app._tasks['add'] = Mock(name='add_task')
             self.b.on_chord_part_return(request, states.SUCCESS, 10)
             task.backend.fail_from_current_stack.assert_called_with(
@@ -1420,7 +1434,7 @@ class test_RedisBackend_chords_simple(basetest_RedisBackend):
             self.b.client.pipeline = ContextMock()
             raise_on_second_call(self.b.client.pipeline, RuntimeError())
             self.b.client.pipeline.return_value.rpush().llen().get().get().expire(
-            ).expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6)
+            ).expire().expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6, 7)
             task = self.app._tasks['add'] = Mock(name='add_task')
             self.b.on_chord_part_return(request, states.SUCCESS, 10)
             task.backend.fail_from_current_stack.assert_called_with(
@@ -1436,12 +1450,42 @@ class test_RedisBackend_chords_simple(basetest_RedisBackend):
             self.b.client.pipeline = ContextMock()
             raise_on_second_call(self.b.client.pipeline, RuntimeError())
             self.b.client.pipeline.return_value.zadd().zcount().get().get().expire(
-            ).expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6)
+            ).expire().expire().expire().execute.return_value = (1, 1, 0, b'1', 4, 5, 6, 7)
             task = self.app._tasks['add'] = Mock(name='add_task')
             self.b.on_chord_part_return(request, states.SUCCESS, 10)
             task.backend.fail_from_current_stack.assert_called_with(
                 callback.id, exc=ANY,
             )
+
+    def test_on_chord_part_return_group_key_deleted_on_completion(self):
+        """GroupResult key (gkey) is deleted when chord completes."""
+        with self.chord_context(1) as (_, request, callback):
+            self.b.on_chord_part_return(request, states.SUCCESS, 10)
+            gkey = self.b.get_key_for_group(request.group)
+            self.b.client.delete.assert_any_call(gkey)
+
+    def test_on_chord_part_return_group_key_expired_during_execution(self):
+        """GroupResult key (gkey) TTL is refreshed on each partial return."""
+        tasks = [self.create_task(i) for i in range(3)]
+        self.b.expires = 300
+
+        # Submit the first partial return (chord not yet complete)
+        self.b.on_chord_part_return(tasks[0].request, states.SUCCESS, 0)
+        gkey = self.b.get_key_for_group('group_id')
+        self.b.client.expire.assert_any_call(gkey, 300)
+
+    def test_on_chord_part_return_group_key_no_expire_when_expires_none(self):
+        """GroupResult key gets no expire when self.expires is None."""
+        old_expires = self.b.expires
+        self.b.expires = None
+        tasks = [self.create_task(i) for i in range(10)]
+        self.b.set_chord_size('group_id', 10)
+
+        for i in range(10):
+            self.b.on_chord_part_return(tasks[i].request, states.SUCCESS, i)
+        self.b.client.expire.assert_not_called()
+
+        self.b.expires = old_expires
 
 
 class test_RedisBackend_chords_complex(basetest_RedisBackend):
@@ -1524,6 +1568,27 @@ class test_RedisBackend_chords_complex(basetest_RedisBackend):
         else:
             expected_join = mock_result_obj.join
         callback.delay.assert_called_once_with(expected_join())
+
+    def test_on_chord_part_return_group_key_deleted_on_completion(
+        self, complex_header_result,
+    ):
+        """GroupResult key (gkey) is deleted when a complex chord completes."""
+        with self.chord_context(1) as (_, request, callback):
+            self.b.on_chord_part_return(request, states.SUCCESS, 42)
+        gkey = self.b.get_key_for_group(request.group)
+        self.b.client.delete.assert_any_call(gkey)
+
+    def test_on_chord_part_return_group_key_expired_during_execution(
+        self, complex_header_result,
+    ):
+        """GroupResult key TTL is refreshed on each partial return for complex chords."""
+        self.b.expires = 300
+        tasks = [self.create_task(i) for i in range(3)]
+
+        # Submit first partial return (chord not yet complete)
+        self.b.on_chord_part_return(tasks[0].request, states.SUCCESS, 0)
+        gkey = self.b.get_key_for_group('group_id')
+        self.b.client.expire.assert_any_call(gkey, 300)
 
 
 class test_SentinelBackend:
