@@ -362,6 +362,19 @@ class RedisBackend(BaseKeyValueStoreBackend, AsyncBackendMixin):
                 self.connection_errors = (
                     self.connection_errors + tuple(extra)
                 )
+        self.result_store_callback = transport_options.get(
+            'result_store_callback',
+        )
+        if isinstance(self.result_store_callback, str):
+            self.result_store_callback = symbol_by_name(
+                self.result_store_callback,
+            )
+        if (self.result_store_callback is not None and
+                not callable(self.result_store_callback)):
+            raise ValueError(
+                'result_store_callback must be a callable or a '
+                'dotted path to a callable'
+            )
         self.result_consumer = self.ResultConsumer(
             self, self.app, self.accept,
             self._pending_results, self._pending_messages,
@@ -519,6 +532,18 @@ class RedisBackend(BaseKeyValueStoreBackend, AsyncBackendMixin):
                 pipe.set(key, value)
             pipe.publish(key, value)
             pipe.execute()
+
+    def on_result_stored(self, task_id, state, meta, **kwargs):
+        if self.result_store_callback is None or state not in states.READY_STATES:
+            return None
+        try:
+            self.result_store_callback(meta['task_id'], meta)
+        except Exception:  # pragma: no cover
+            logger.exception(
+                'Redis result_store_callback raised for task %s',
+                meta['task_id'],
+            )
+        return None
 
     def forget(self, task_id):
         super().forget(task_id)
