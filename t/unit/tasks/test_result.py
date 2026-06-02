@@ -1,6 +1,7 @@
 import copy
 import datetime
 import platform
+import re
 import traceback
 from contextlib import contextmanager
 from unittest.mock import Mock, call, patch
@@ -341,6 +342,18 @@ class test_AsyncResult:
         assert ok_res.info == 'the'
         assert none_res.get() is None
         assert none_res.state == states.SUCCESS
+
+    @pytest.mark.parametrize('failure_value', ['bad payload', {'bad': 'payload'}, ['bad', 'payload'], None])
+    def test_maybe_throw_with_non_exception_failure_value(self, failure_value):
+        result = self.app.AsyncResult(uuid())
+        result._cache = {
+            'status': states.FAILURE,
+            'result': failure_value,
+            'traceback': None,
+        }
+        expected = str(failure_value)
+        with pytest.raises(Exception, match=re.escape(expected)):
+            result.maybe_throw()
 
     def test_get_when_ignored(self):
         result = self.app.AsyncResult(uuid())
