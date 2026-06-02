@@ -1309,6 +1309,7 @@ class test_tasks(TasksCase):
     def test_context_update_preserves_custom_fields(self):
         self.mytask.push_request()
         try:
+            assert self.mytask.request.headers is None
             self.mytask.request.update({'tenant': 'acme', 'meta': {'region': 'eu'}})
             assert self.mytask.request.tenant == 'acme'
             assert self.mytask.request.meta == {'region': 'eu'}
