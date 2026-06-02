@@ -411,6 +411,21 @@ class test_chain(CanvasCase):
         assert x.clone().args == x.args
         assert isinstance(x.clone(), chain_type)
 
+    def test_clone_preserves_callback_signatures(self):
+        callback = self.mul.s(8).set(link=self.add.s(2), link_error=self.div.s(2))
+        errback = self.div.s(4)
+        sig = (self.add.s(2, 2) | self.add.s(4)).set(
+            link=callback,
+            link_error=errback,
+        )
+
+        cloned = sig.clone()
+
+        assert isinstance(cloned.options['link'], Signature)
+        assert isinstance(cloned.options['link_error'], Signature)
+        assert isinstance(cloned.options['link'].options['link'], Signature)
+        assert isinstance(cloned.options['link'].options['link_error'], Signature)
+
     def test_repr(self):
         x = self.add.s(2, 2) | self.add.s(2)
         assert repr(x) == f'{self.add.name}(2, 2) | add(2)'

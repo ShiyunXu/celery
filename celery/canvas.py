@@ -1012,6 +1012,19 @@ class _chain(Signature):
             to_signature(sig, app=self._app, clone=True)
             for sig in signature.kwargs['tasks']
         ]
+        for key in ('link', 'link_error'):
+            value = signature.options.get(key)
+            if value is not None:
+                cloned_value = [
+                    to_signature(sig, app=self._app, clone=True)
+                    for sig in maybe_list(value) or []
+                ]
+                if isinstance(value, MutableSequence):
+                    signature.options[key] = cloned_value
+                elif len(cloned_value) == 1:
+                    signature.options[key] = cloned_value[0]
+                else:
+                    signature.options[key] = cloned_value
         return signature
 
     def unchain_tasks(self):
