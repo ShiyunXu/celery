@@ -106,6 +106,17 @@ class test_Context:
         ctx.update(request)
         assert ctx.headers == {'custom-header': 'custom-value'}
 
+    def test_update_dont_override_headers(self):
+        request = {
+            'task': 'test.test_task',
+            'id': 'e16eeaee-1172-49bb-9098-5437a509ffd9',
+            'headers': {'custom-header': 'custom-value'},
+            'custom-header-2': 'custom-value-2',
+        }
+        ctx = Context()
+        ctx.update(request)
+        assert ctx.headers == {'custom-header': 'custom-value'}
+
     # ------------------------------------------------------------------
     # Context.update() – timelimit detection with non-Mapping iterables
     # ------------------------------------------------------------------

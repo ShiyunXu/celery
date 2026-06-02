@@ -114,8 +114,10 @@ class Context:
     stamps = None
 
     def __init__(self, *args, **kwargs):
-        self.update(*args, **kwargs)
-        self._update_custom_headers(*args, **kwargs)
+        updates = {}
+        updates.update(*args, **kwargs)
+        self.update(updates)
+        self._update_custom_headers(updates)
 
     def _update_custom_headers(self, *args, **kwargs):
         if self.headers is None:
