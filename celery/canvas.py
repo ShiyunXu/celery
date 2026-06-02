@@ -942,11 +942,13 @@ class _chain(Signature):
             if isinstance(tasks, tuple):  # aaaargh
                 tasks = d['kwargs']['tasks'] = list(tasks)
             tasks = [maybe_signature(task, app=app) for task in tasks]
+        options = dict(d.get('options') or {})
+        immutable = options.pop('immutable', d.get('immutable', False))
         return cls(
             tasks,
             app=app,
-            immutable=d.get('immutable', False),
-            **(d.get('options') or {}),
+            immutable=immutable,
+            **options,
         )
 
     def __init__(self, *tasks, **options):

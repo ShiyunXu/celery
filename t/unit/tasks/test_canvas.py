@@ -460,6 +460,10 @@ class test_chain(CanvasCase):
         assert deserialized.immutable is True
         assert deserialized.tasks[0].options == c.tasks[0].options
         assert deserialized.tasks[1].options == c.tasks[1].options
+        assert deserialized.tasks[0].options["countdown"] == 10
+        assert deserialized.tasks[0].options["headers"] == {"custom": "one"}
+        assert deserialized.tasks[1].options["queue"] == "test-q"
+        assert deserialized.tasks[1].options["headers"] == {"custom": "two"}
         assert deserialized.tasks[1].immutable is True
 
     @pytest.mark.usefixtures('depends_on_current_app')
