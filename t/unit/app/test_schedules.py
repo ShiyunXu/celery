@@ -8,7 +8,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from celery.schedules import ParseException, crontab, crontab_parser, schedule, solar
+from celery.schedules import ParseException, crontab, crontab_parser, maybe_schedule, schedule, solar
 
 if sys.version_info >= (3, 9):
     from zoneinfo import ZoneInfo
@@ -113,6 +113,14 @@ class test_schedule:
         fun, args = s1.__reduce__()
         s2 = fun(*args)
         assert s1 == s2
+
+    def test_maybe_schedule_from_timedelta_string(self):
+        assert maybe_schedule('30s', app=self.app).run_every == timedelta(seconds=30)
+        assert maybe_schedule('5m', app=self.app).run_every == timedelta(minutes=5)
+
+    def test_maybe_schedule_from_invalid_timedelta_string(self):
+        with pytest.raises(ValueError, match='Invalid timedelta string'):
+            maybe_schedule('5', app=self.app)
 
 
 # Module-level helper used as crontab(nowfun=...) in pickling tests.

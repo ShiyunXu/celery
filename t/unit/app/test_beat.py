@@ -129,6 +129,21 @@ class test_ScheduleEntry:
         assert entry.kwargs == {'callback': 'foo.bar.baz'}
         assert entry.options == {'routing_key': 'urgent'}
 
+    @pytest.mark.parametrize(('value', 'expected'), (
+        ('30s', timedelta(seconds=30)),
+        ('5m', timedelta(minutes=5)),
+        ('2.5h', timedelta(hours=2.5)),
+        ('1d', timedelta(days=1)),
+    ))
+    def test_schedule_as_timedelta_string(self, value, expected):
+        entry = self.create_entry(schedule=value)
+        assert entry.schedule == schedule(expected)
+
+    def test_schedule_as_invalid_timedelta_string(self):
+        for value in ('oops', '5', '5x'):
+            with pytest.raises(ValueError, match='Invalid timedelta string'):
+                self.create_entry(schedule=value)
+
 
 class mScheduler(beat.Scheduler):
 
