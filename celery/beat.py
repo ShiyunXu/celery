@@ -395,9 +395,11 @@ class Scheduler:
         # so we have that done if an exception is raised (doesn't schedule
         # forever.)
         entry = self.reserve(entry) if advance else entry
-        task = self.app.tasks.get(entry.task)
 
         try:
+            if not entry.task:
+                raise ValueError('Schedule entry has no task name')
+            task = self.app.tasks.get(entry.task)
             entry_args = _evaluate_entry_args(entry.args)
             entry_kwargs = _evaluate_entry_kwargs(entry.kwargs)
             if task:
