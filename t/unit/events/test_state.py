@@ -415,6 +415,30 @@ class test_State:
         assert list(r.state.alive_workers())
         assert r.state.workers['utest1'].alive
 
+    def test_task_event_uses_local_received_for_worker_heartbeat(self):
+        s = State()
+        s.event({
+            'type': 'worker-online',
+            'hostname': 'foo@bar',
+            'timestamp': 995.0,
+            'local_received': 1000.0,
+            'clock': 1,
+        })
+        worker = s.workers['foo@bar']
+
+        s.event({
+            'type': 'task-received',
+            'uuid': 'id1',
+            'name': 'celery.ping',
+            'hostname': 'foo@bar',
+            'timestamp': 996.0,
+            'local_received': 1006.0,
+            'clock': 2,
+        })
+
+        assert worker.heartbeats[-1] == 1006.0
+        assert worker.heartbeat_expires == 1126.0
+
     def test_task_states(self):
         r = ev_task_states(State())
 
