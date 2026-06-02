@@ -1306,6 +1306,26 @@ class test_tasks(TasksCase):
         finally:
             self.mytask.pop_request()
 
+    def test_context_update_preserves_custom_fields(self):
+        self.mytask.push_request()
+        try:
+            self.mytask.request.update({'tenant': 'acme', 'meta': {'region': 'eu'}})
+            assert self.mytask.request.tenant == 'acme'
+            assert self.mytask.request.meta == {'region': 'eu'}
+            assert self.mytask.request.headers == {
+                'tenant': 'acme',
+                'meta': {'region': 'eu'},
+            }
+
+            self.mytask.request.update({'meta': {'region': 'us'}})
+            assert self.mytask.request.meta == {'region': 'us'}
+            assert self.mytask.request.headers == {
+                'tenant': 'acme',
+                'meta': {'region': 'us'},
+            }
+        finally:
+            self.mytask.pop_request()
+
     def test_task_inherits_time_limit_from_app_config(self):
         """Task.bind() must copy task_time_limit and task_soft_time_limit from app config."""
         self.app.conf.task_time_limit = 60
