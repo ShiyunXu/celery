@@ -92,10 +92,18 @@ class ResultConsumer(BaseResultConsumer):
                 self._pubsub.close()
         except KeyError as e:
             logger.warning(str(e))
+        self._pubsub = None
+        self.subscribed_to = set()
         super().on_after_fork()
 
     def _reconnect_pubsub(self):
+        old_pubsub = self._pubsub
         self._pubsub = None
+        if old_pubsub is not None:
+            try:
+                old_pubsub.close()
+            except Exception:
+                pass
         self.backend.client.connection_pool.reset()
         # task state might have changed when the connection was down so we
         # retrieve meta for all subscribed tasks before going into pubsub mode
