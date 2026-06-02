@@ -1238,6 +1238,7 @@ class BaseKeyValueStoreBackend(Backend):
                 self.delete(key)
         else:
             self.expire(key, self.expires)
+            self.expire(self.get_key_for_group(gid), self.expires)
 
 
 class KeyValueStoreBackend(BaseKeyValueStoreBackend, SyncBackendMixin):

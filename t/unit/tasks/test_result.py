@@ -789,6 +789,35 @@ class test_GroupResult:
         with pytest.raises(AttributeError):
             self.app.GroupResult.restore(ts.id, backend=object())
 
+    def test_backend_expire_calls_backend_expire(self):
+        """backend_expire refreshes the stored group result's TTL via the backend."""
+        subs = [MockAsyncResultSuccess(uuid(), app=self.app)]
+        ts = self.app.GroupResult(uuid(), subs)
+        mock_backend = Mock()
+        mock_backend.get_key_for_group = Mock(return_value=b'mock-key')
+        mock_backend.expires = 300
+        ts.backend_expire(timeout=300, backend=mock_backend)
+        mock_backend.expire.assert_called_once_with(b'mock-key', 300)
+
+    def test_backend_expire_uses_backend_default_timeout(self):
+        """backend_expire uses backend.expires when no timeout given."""
+        subs = [MockAsyncResultSuccess(uuid(), app=self.app)]
+        ts = self.app.GroupResult(uuid(), subs)
+        mock_backend = Mock()
+        mock_backend.get_key_for_group = Mock(return_value=b'mock-key')
+        mock_backend.expires = 600
+        ts.backend_expire(backend=mock_backend)
+        mock_backend.expire.assert_called_once_with(b'mock-key', 600)
+
+    def test_backend_expire_no_op_when_timeout_is_zero(self):
+        """backend_expire does nothing when timeout is 0 (no expiry configured)."""
+        subs = [MockAsyncResultSuccess(uuid(), app=self.app)]
+        ts = self.app.GroupResult(uuid(), subs)
+        mock_backend = Mock()
+        mock_backend.expires = 0
+        ts.backend_expire(timeout=0, backend=mock_backend)
+        mock_backend.expire.assert_not_called()
+
     def test_save_restore_empty(self):
         subs = []
         ts = self.app.GroupResult(uuid(), subs)
