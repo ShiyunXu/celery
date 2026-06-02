@@ -1,4 +1,5 @@
 """Click customizations for Celery."""
+import ast
 import json
 import numbers
 from collections import OrderedDict
@@ -247,8 +248,11 @@ class JsonArray(ParamType):
 
         try:
             v = json.loads(value)
-        except ValueError as e:
-            self.fail(str(e))
+        except ValueError:
+            try:
+                v = ast.literal_eval(value)
+            except (ValueError, SyntaxError) as e:
+                self.fail(str(e))
 
         if not isinstance(v, list):
             self.fail(f"{value} was not an array")
@@ -267,8 +271,11 @@ class JsonObject(ParamType):
 
         try:
             v = json.loads(value)
-        except ValueError as e:
-            self.fail(str(e))
+        except ValueError:
+            try:
+                v = ast.literal_eval(value)
+            except (ValueError, SyntaxError) as e:
+                self.fail(str(e))
 
         if not isinstance(v, dict):
             self.fail(f"{value} was not an object")
