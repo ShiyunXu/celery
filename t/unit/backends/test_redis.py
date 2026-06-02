@@ -1090,7 +1090,7 @@ class test_RedisBackend(basetest_RedisBackend):
 
         callback.assert_not_called()
 
-    def test_result_store_callback_not_called_when_success_already_stored(self):
+    def test_result_store_callback_not_called_when_ready_state_already_stored(self):
         callback = Mock()
         self.app.conf.result_backend_transport_options = dict(
             result_store_callback=callback,
