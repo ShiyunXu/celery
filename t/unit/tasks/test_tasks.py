@@ -1327,6 +1327,16 @@ class test_tasks(TasksCase):
         finally:
             self.mytask.pop_request()
 
+    def test_context_update_standard_fields_do_not_create_custom_headers(self):
+        self.mytask.push_request()
+        try:
+            assert self.mytask.request.headers is None
+            self.mytask.request.update({'id': 'task-id'})
+            assert self.mytask.request.id == 'task-id'
+            assert self.mytask.request.headers is None
+        finally:
+            self.mytask.pop_request()
+
     def test_task_inherits_time_limit_from_app_config(self):
         """Task.bind() must copy task_time_limit and task_soft_time_limit from app config."""
         self.app.conf.task_time_limit = 60
