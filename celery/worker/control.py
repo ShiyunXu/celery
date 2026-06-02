@@ -414,19 +414,54 @@ def scheduled(state, **kwargs):
     return list(_iter_schedule_requests(state.consumer.timer))
 
 
-def _iter_schedule_requests(timer):
+@inspect_command(alias='dump_eta')
+def eta(state, **kwargs):
+    """List of tasks currently waiting on ETA/countdown."""
+    return list(_iter_eta_requests(state.consumer))
+
+
+def _iter_schedule_requests(source):
+    for waiting, request in _iter_eta_schedule(source):
+        yield {
+            'eta': request.eta.isoformat() if request.eta else None,
+            'priority': waiting.priority,
+            'request': request.info(),
+        }
+
+
+def _iter_eta_requests(source):
+    for _, request in _iter_eta_schedule(source):
+        delivery_info = request.delivery_info or {}
+        yield {
+            'id': request.id,
+            'name': request.name,
+            'eta': request.eta.isoformat() if request.eta else None,
+            'queue': delivery_info.get('routing_key'),
+        }
+
+
+def _iter_eta_schedule(source):
+    if hasattr(source, 'iter_eta_schedule'):
+        iterator = source.iter_eta_schedule()
+    else:
+        iterator = _iter_timer_schedule(source)
+
+    for waiting, request in iterator:
+        if isinstance(request, Request):
+            yield waiting, request
+
+
+def _iter_timer_schedule(timer):
     for waiting in timer.schedule.queue:
+        entry = getattr(waiting, 'entry', None)
+        args = getattr(entry, 'args', None)
+        if not args:
+            continue
         try:
-            arg0 = waiting.entry.args[0]
+            request = args[0]
         except (IndexError, TypeError):
             continue
-        else:
-            if isinstance(arg0, Request):
-                yield {
-                    'eta': arg0.eta.isoformat() if arg0.eta else None,
-                    'priority': waiting.priority,
-                    'request': arg0.info(),
-                }
+        yield waiting, request
 
 
 @inspect_command(alias='dump_reserved')
