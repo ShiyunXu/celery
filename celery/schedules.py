@@ -50,6 +50,16 @@ SOLAR_INVALID_EVENT = """\
 Argument event "{event}" is invalid, must be one of {all_events}.\
 """
 
+_TIMEDELTA_STRING_RE = re.compile(
+    r'^\s*(?P<value>\d+(?:\.\d+)?)\s*(?P<unit>[smhd])\s*$',
+)
+_TIMEDELTA_UNITS = {
+    's': 'seconds',
+    'm': 'minutes',
+    'h': 'hours',
+    'd': 'days',
+}
+
 
 Cronspec = Union[int, str, Iterable[int]]
 
@@ -708,24 +718,15 @@ def maybe_schedule(
         if isinstance(s, (float, int)):
             s = timedelta(seconds=s)
         elif isinstance(s, str):
-            separator = re.search(r'[^\d.]+', s)
-            if separator and separator.start() > 0 and separator.end() == len(s):
-                val = float(s[:separator.start()])
-                unit = s[separator.start():]
-                unit_names = {'s': 'seconds', 'm': 'minutes',
-                              'h': 'hours', 'd': 'days'}
-                if unit in unit_names:
-                    s = timedelta(**{unit_names[unit]: val})
-                else:
-                    raise ValueError(
-                        f'Invalid timedelta string {s!r}; expected suffix '
-                        'to be one of: s, m, h, d.',
-                    )
-            else:
+            match = _TIMEDELTA_STRING_RE.fullmatch(s)
+            if not match:
                 raise ValueError(
                     f'Invalid timedelta string {s!r}; expected format like '
                     '"30s" or "5m".',
                 )
+            s = timedelta(**{
+                _TIMEDELTA_UNITS[match.group('unit')]: float(match.group('value')),
+            })
         if isinstance(s, timedelta):
             return schedule(s, relative, app=app)
         else:
