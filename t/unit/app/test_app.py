@@ -328,6 +328,15 @@ class test_App:
             assert app.conf.broker_url == 'foo://bar'
             assert app._preconf['worker_agent'] == 'foo:Bar'
 
+    def test_pending_configuration__update_result_expires_iso_string(self):
+        with self.Celery(backend='cache+memory://', timezone='UTC') as app:
+            app.conf.update(
+                result_expires='2999-01-01T00:00:00Z',
+            )
+            assert not app.configured
+            assert isinstance(app._preconf['result_expires'], timedelta)
+            assert app.backend.expires > 0
+
     def test_pending_configuration__compat_settings(self):
         with self.Celery(broker='foo://bar', backend='foo') as app:
             app.conf.update(

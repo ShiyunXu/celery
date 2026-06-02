@@ -9,7 +9,7 @@ import types
 import typing
 import warnings
 from collections import UserDict, defaultdict, deque
-from datetime import datetime
+from datetime import datetime, timedelta
 from datetime import timezone as datetime_timezone
 from operator import attrgetter
 
@@ -216,21 +216,44 @@ class PendingConfiguration(UserDict, AttributeDictMixin):
     callback = None
     _data = None
 
+    _datetime_result_expires_keys = {
+        'result_expires',
+        'celery_result_expires',
+        'celery_task_result_expires',
+    }
+
     def __init__(self, conf, callback):
         object.__setattr__(self, '_data', conf)
         object.__setattr__(self, 'callback', callback)
 
+    def _prepare_value(self, key, value):
+        if (
+            isinstance(key, str)
+            and isinstance(value, str)
+            and key.lower() in self._datetime_result_expires_keys
+        ):
+            try:
+                expires_at = maybe_make_aware(isoparse(value))
+            except (TypeError, ValueError):
+                return value
+            expires_in = expires_at - datetime.now(datetime_timezone.utc)
+            return max(expires_in, timedelta(0))
+        return value
+
     def __setitem__(self, key, value):
-        self._data[key] = value
+        self._data[key] = self._prepare_value(key, value)
 
     def clear(self):
         self._data.clear()
 
     def update(self, *args, **kwargs):
-        self._data.update(*args, **kwargs)
+        for key, value in dict(*args, **kwargs).items():
+            self[key] = value
 
-    def setdefault(self, *args, **kwargs):
-        return self._data.setdefault(*args, **kwargs)
+    def setdefault(self, key, default=None):
+        if key not in self._data:
+            self[key] = default
+        return self._data[key]
 
     def __contains__(self, key):
         # XXX will not show finalized configuration
