@@ -659,7 +659,7 @@ class Consumer:
         self.qos.decrement_eventually()
 
     def iter_eta_schedule(self):
-        """Yield timer entries currently waiting on ETA/countdown."""
+        """Yield ``(waiting, request)`` pairs for ETA/countdown timer entries."""
         for waiting in self.timer.schedule.queue:
             try:
                 request = waiting.entry.args[0]

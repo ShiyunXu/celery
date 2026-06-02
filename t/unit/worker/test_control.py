@@ -466,6 +466,10 @@ class test_ControlPanel:
             consumer.timer.Entry(lambda x: x, (object(),)),
             datetime.now() + timedelta(seconds=10),
         )
+        consumer.timer.schedule.enter_at(
+            consumer.timer.Entry(lambda: None, ()),
+            datetime.now() + timedelta(seconds=10),
+        )
         response = panel.handle('dump_eta')
         assert len(response) == 1
         assert response[0] == {
