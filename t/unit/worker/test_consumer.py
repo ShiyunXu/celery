@@ -1228,7 +1228,15 @@ class test_Mingle:
         mingle = Mingle(c, without_mingle=True)
         with patch('celery.worker.consumer.mingle.info') as info:
             assert not mingle.include_if(c)
-            info.assert_called_once_with('mingle: disabled')
+            info.assert_called_once_with('mingle: disabled (%s)', 'by configuration')
+
+    def test_include_if_disabled_by_transport(self):
+        c = Mock()
+        c.app.connection_for_read = _memory_connection()
+        mingle = Mingle(c)
+        with patch('celery.worker.consumer.mingle.info') as info:
+            assert not mingle.include_if(c)
+            info.assert_called_once_with('mingle: disabled (%s)', 'by transport')
 
     def test_start_no_replies(self):
         c = Mock()
@@ -1281,6 +1289,13 @@ def _amqp_connection():
     connection = ContextMock(name='Connection')
     connection.return_value = ContextMock(name='connection')
     connection.return_value.transport.driver_type = 'amqp'
+    return connection
+
+
+def _memory_connection():
+    connection = ContextMock(name='Connection')
+    connection.return_value = ContextMock(name='connection')
+    connection.return_value.transport.driver_type = 'memory'
     return connection
 
 
