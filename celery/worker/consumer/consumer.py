@@ -725,6 +725,7 @@ class Consumer:
         call_soon_ack = self.call_soon_ack
 
         class _BodyBytesCompatMessage:
+            """Proxy with a minimal decoded payload for legacy raw-bytes bodies."""
             payload = ((), {}, None)
 
             def __init__(self, message):

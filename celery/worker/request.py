@@ -11,6 +11,7 @@ from weakref import ref
 
 from billiard.common import TERM_SIGNAME
 from billiard.einfo import ExceptionInfo, ExceptionWithTraceback
+from kombu.exceptions import DecodeError
 from kombu.utils.encoding import safe_repr, safe_str
 from kombu.utils.objects import cached_property
 
@@ -110,17 +111,15 @@ class Request:
         if self._decoded:
             self.__payload = self._body
         else:
+            body_is_bytes = isinstance(self._body, (bytes, bytearray, memoryview))
             try:
                 payload = message.payload
-            except Exception:  # pragma: no cover
-                if isinstance(self._body, (bytes, bytearray, memoryview)):
+            except DecodeError:
+                if body_is_bytes:
                     payload = ((), {}, None)
                 else:
                     raise
-            if (
-                isinstance(self._body, (bytes, bytearray, memoryview))
-                and not isinstance(payload, (tuple, list))
-            ):
+            if body_is_bytes and not isinstance(payload, (tuple, list)):
                 payload = ((), {}, None)
             self.__payload = payload
         self.id = self._request_dict['id']
