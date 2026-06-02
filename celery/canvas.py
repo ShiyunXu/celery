@@ -1261,7 +1261,13 @@ class _chain(Signature):
                     # link previous task to this task.
                     task.link(prev_task)
 
-                if prev_res and not prev_res.parent:
+                if prev_res and (
+                    not prev_res.parent or
+                    # When a middle group is upgraded to a chord, we replace a
+                    # previously frozen task result with a fresh result object
+                    # that can share the same task id. Rewire to keep lineage.
+                    prev_res.parent.id == res.id
+                ):
                     prev_res.parent = res
 
             if link_error:
