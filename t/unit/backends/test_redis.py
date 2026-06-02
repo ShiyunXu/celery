@@ -1043,6 +1043,74 @@ class test_RedisBackend(basetest_RedisBackend):
         self.b.forget(tid)
         assert self.b.get_state(tid) == states.PENDING
 
+    @pytest.mark.parametrize(
+        'store,state',
+        (
+            (lambda backend, task_id: backend.store_result(task_id, 42, states.SUCCESS),
+             states.SUCCESS),
+            (lambda backend, task_id: backend.mark_as_failure(
+                task_id, RuntimeError('failed'), traceback='tb'),
+             states.FAILURE),
+            (lambda backend, task_id: backend.mark_as_revoked(task_id, 'revoked'),
+             states.REVOKED),
+        ),
+    )
+    def test_result_store_callback_called_for_ready_states(self, store, state):
+        callback = Mock()
+        self.app.conf.result_backend_transport_options = dict(
+            result_store_callback=callback,
+        )
+        backend = self.Backend(app=self.app)
+        task_id = uuid()
+
+        store(backend, task_id)
+
+        callback.assert_called_once()
+        callback_task_id, meta = callback.call_args.args
+        assert callback_task_id == task_id
+        assert meta['task_id'] == task_id
+        assert meta['status'] == state
+        if state == states.SUCCESS:
+            assert meta['result'] == 42
+        elif state == states.FAILURE:
+            assert meta['result']['exc_type'] == 'RuntimeError'
+            assert meta['traceback'] == 'tb'
+        else:
+            assert meta['result']['exc_type'] == 'TaskRevokedError'
+
+    def test_result_store_callback_not_called_for_non_ready_states(self):
+        callback = Mock()
+        self.app.conf.result_backend_transport_options = dict(
+            result_store_callback=callback,
+        )
+        backend = self.Backend(app=self.app)
+
+        backend.mark_as_started(uuid(), pid=1234)
+        backend.mark_as_retry(uuid(), RuntimeError('retry'), traceback='tb')
+
+        callback.assert_not_called()
+
+    def test_result_store_callback_not_called_when_ready_state_already_stored(self):
+        callback = Mock()
+        self.app.conf.result_backend_transport_options = dict(
+            result_store_callback=callback,
+        )
+        backend = self.Backend(app=self.app)
+        task_id = uuid()
+
+        backend.store_result(task_id, 42, states.SUCCESS)
+        backend.store_result(task_id, 84, states.FAILURE)
+
+        callback.assert_called_once()
+
+    def test_result_store_callback_must_be_callable(self):
+        self.app.conf.result_backend_transport_options = dict(
+            result_store_callback=object(),
+        )
+
+        with pytest.raises(ValueError, match='result_store_callback'):
+            self.Backend(app=self.app)
+
     def test_set_expires(self):
         self.b = self.Backend(expires=512, app=self.app)
         tid = uuid()

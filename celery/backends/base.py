@@ -727,6 +727,10 @@ class Backend:
         """Hook called before retrying a recoverable backend exception."""
         return None
 
+    def on_result_stored(self, task_id, state, meta, **kwargs):
+        """Hook called after a task result has been stored."""
+        return None
+
     def get_task_meta(self, task_id, cache=True):
         """Get task meta from backend.
 
@@ -1118,6 +1122,7 @@ class BaseKeyValueStoreBackend(Backend):
             self._set_with_state(self.get_key_for_task(task_id), self.encode(meta), state)
         except BackendStoreError as ex:
             raise BackendStoreError(str(ex), state=state, task_id=task_id) from ex
+        self.on_result_stored(task_id, state, meta, request=request, **kwargs)
 
         return result
 
