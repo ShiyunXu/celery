@@ -129,14 +129,16 @@ class Context:
         return headers
 
     def update(self, *args, **kwargs):
-        # O(1) detection: snapshot the current timelimit identity before the
-        # update, then compare after.  Any input form that dict.update()
-        # accepts (Mapping, iterable of pairs, kwargs) will change the stored
-        # object if 'timelimit' was present, so an `is not` identity check is
-        # sufficient — no need to pre-scan the arguments.
+        updates = dict(*args, **kwargs)
         old_timelimit = self.__dict__.get('timelimit', _UNSET)
 
-        self.__dict__.update(*args, **kwargs)
+        self.__dict__.update(updates)
+
+        custom_headers = self._get_custom_headers(updates)
+        if custom_headers:
+            if self.headers is None:
+                self.headers = {}
+            self.headers.update(custom_headers)
 
         new_timelimit = self.__dict__.get('timelimit', _UNSET)
         if new_timelimit is not old_timelimit:
