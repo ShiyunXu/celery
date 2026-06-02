@@ -513,6 +513,86 @@ class test_AsynPool:
         hub.remove.assert_called_once_with(fd)
         assert proc._sentinel_poll is None
 
+    def test_untrack_child_process_closes_fd_even_if_hub_remove_raises(self):
+        """_untrack_child_process must close the fd even when hub.remove raises.
+
+        If hub.remove raises an exception, the os.close call must still be
+        reached to prevent stale file descriptors from accumulating.
+        """
+        pytest.importorskip('multiprocessing')
+        pool = asynpool.AsynPool(processes=1, threads=False)
+        hub = Mock(name='hub')
+        hub.remove.side_effect = RuntimeError('hub error')
+        fd = os.open(os.devnull, os.O_RDONLY)
+        proc = Mock(_sentinel_poll=fd)
+        with pytest.raises(RuntimeError):
+            pool._untrack_child_process(proc, hub)
+        # The fd must be closed despite hub.remove raising
+        with pytest.raises(OSError):
+            os.fstat(fd)  # raises EBADF if fd was properly closed
+        assert proc._sentinel_poll is None
+
+    @t.skip.if_pypy
+    @patch('billiard.pool.Pool._create_worker_process')
+    def test_on_process_down_dead_proc_untracks_sentinel(self, _create_worker_process):
+        """on_process_down must untrack the sentinel fd even when proc.dead is True.
+
+        When a process is marked dead (partial write scenario), on_process_down
+        previously returned early before calling _untrack_child_process, leaving
+        the duplicated sentinel fd open if the hub callback never fires.
+        """
+        pool = asynpool.AsynPool(processes=1, threads=False)
+        hub = Mock(name='hub')
+        pool._create_process_handlers(hub)
+
+        fd = os.open(os.devnull, os.O_RDONLY)
+        proc = Mock()
+        proc.dead = True
+        proc._sentinel_poll = fd
+
+        pool.on_process_down(proc)
+
+        # The sentinel fd must be closed via hub.remove + os.close
+        hub.remove.assert_called_once_with(fd)
+        assert proc._sentinel_poll is None
+        # Verify the OS fd was actually closed
+        with pytest.raises(OSError):
+            os.fstat(fd)  # raises EBADF if fd was properly closed
+
+    @t.skip.if_pypy
+    @patch('billiard.pool.Pool._create_worker_process')
+    def test_destroy_queues_closes_sockets_even_if_hub_remove_raises(self, _create_worker_process):
+        """destroy_queues must close sockets even when hub_remove raises.
+
+        If hub_remove raises an exception during queue teardown, the underlying
+        sockets must still all be closed to avoid stale file descriptors.
+        """
+        pool = asynpool.AsynPool(processes=1, threads=False)
+        hub = Mock(name='hub')
+        pool._create_write_handlers(hub)
+
+        reader = Mock()
+        reader.closed = False
+
+        writer = Mock()
+        writer.closed = False
+
+        queue = Mock()
+        queue._reader = reader
+        queue._writer = writer
+
+        pool.hub_remove = Mock(side_effect=RuntimeError('hub error'))
+
+        proc = Mock()
+        proc._is_alive.return_value = False
+
+        # destroy_queues must not propagate hub_remove exceptions
+        pool.destroy_queues((queue, None, None), proc)
+
+        # Both sockets must be closed despite hub_remove raising
+        reader.close.assert_called_once()
+        writer.close.assert_called_once()
+
     @t.skip.if_pypy
     def test_flush_no_synack_discards_unaccepted_jobs(self):
         """flush() should discard unaccepted jobs when synack is disabled.
