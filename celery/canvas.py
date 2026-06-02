@@ -931,6 +931,11 @@ def _prepare_chain_from_options(options, tasks, use_link):
                         options)
 
 
+# Options that are handled specially during chain flattening and must NOT be
+# propagated directly to individual tasks as generic execution options.
+_CHAIN_TASK_MERGE_SKIP = frozenset({'link', 'link_error'})
+
+
 @Signature.register_type(name='chain')
 class _chain(Signature):
     tasks = getitem_property('kwargs.tasks', 'Tasks in chain.')
@@ -1035,7 +1040,7 @@ class _chain(Signature):
         # (queue, countdown, routing_key, …) are applied to each task only
         # when the task does not already define that option itself.
         for k, v in self.options.items():
-            if k not in ('link', 'link_error'):
+            if k not in _CHAIN_TASK_MERGE_SKIP:
                 for task in tasks:
                     task.options.setdefault(k, v)
         for sig in maybe_list(self.options.get('link')) or []:
@@ -1225,7 +1230,7 @@ class _chain(Signature):
                 # that task-level options always take precedence.
                 inner_tasks = list(task.tasks)
                 for k, v in task.options.items():
-                    if k not in ('link', 'link_error'):
+                    if k not in _CHAIN_TASK_MERGE_SKIP:
                         for t in inner_tasks:
                             t.options.setdefault(k, v)
                 for sig in maybe_list(task.options.get('link')) or []:
