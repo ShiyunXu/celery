@@ -114,6 +114,8 @@ class AsyncResult(ResultBase):
 
     def then(self, callback, on_error=None, weak=False):
         self.backend.add_pending_result(self, weak=weak)
+        if getattr(self.backend, 'is_async', False):
+            self._maybe_set_cache(self.backend.get_task_meta(self.id))
         return self.on_ready.then(callback, on_error)
 
     def _on_fulfilled(self, result):
