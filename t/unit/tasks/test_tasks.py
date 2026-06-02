@@ -1276,6 +1276,23 @@ class test_tasks(TasksCase):
         finally:
             self.mytask.pop_request()
 
+    def test_context_update_preserves_custom_headers_for_execution_options(self):
+        self.mytask.push_request()
+        try:
+            self.mytask.request.update({'tenant_id': 'acme'})
+            assert self.mytask.request.headers == {'tenant_id': 'acme'}
+            assert self.mytask.request.as_execution_options()['headers'] == {'tenant_id': 'acme'}
+        finally:
+            self.mytask.pop_request()
+
+    def test_context_update_merges_custom_headers_into_existing_headers(self):
+        self.mytask.push_request(headers={'origin': 'unit-test'})
+        try:
+            self.mytask.request.update({'tenant_id': 'acme'})
+            assert self.mytask.request.headers == {'origin': 'unit-test', 'tenant_id': 'acme'}
+        finally:
+            self.mytask.pop_request()
+
     def test_context_timelimit_unpacked_into_time_limit_fields(self):
         """Context.update() must unpack timelimit tuple into time_limit/soft_time_limit."""
         self.mytask.push_request()
