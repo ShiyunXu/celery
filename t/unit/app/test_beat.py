@@ -129,6 +129,14 @@ class test_ScheduleEntry:
         assert entry.kwargs == {'callback': 'foo.bar.baz'}
         assert entry.options == {'routing_key': 'urgent'}
 
+    def test_schedule_as_timedelta_string(self):
+        entry = self.create_entry(schedule='5m')
+        assert entry.schedule == schedule(timedelta(minutes=5))
+
+    def test_schedule_as_invalid_timedelta_string(self):
+        with pytest.raises(ValueError, match='Invalid timedelta string'):
+            self.create_entry(schedule='oops')
+
 
 class mScheduler(beat.Scheduler):
 

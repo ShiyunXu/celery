@@ -701,12 +701,31 @@ class crontab(BaseSchedule):
 
 
 def maybe_schedule(
-        s: int | float | timedelta | BaseSchedule, relative: bool = False,
+        s: int | float | str | timedelta | BaseSchedule, relative: bool = False,
         app: Celery | None = None) -> float | timedelta | BaseSchedule:
-    """Return schedule from number, timedelta, or actual schedule."""
+    """Return schedule from number, timedelta, timedelta string, or schedule."""
     if s is not None:
         if isinstance(s, (float, int)):
             s = timedelta(seconds=s)
+        elif isinstance(s, str):
+            separator = re.search(r'[^\d.]+', s)
+            if separator and separator.start() > 0 and separator.end() == len(s):
+                val = float(s[:separator.start()])
+                unit = s[separator.start():]
+                unit_names = {'s': 'seconds', 'm': 'minutes',
+                              'h': 'hours', 'd': 'days'}
+                if unit in unit_names:
+                    s = timedelta(**{unit_names[unit]: val})
+                else:
+                    raise ValueError(
+                        f'Invalid timedelta string {s!r}; expected suffix '
+                        'to be one of: s, m, h, d.',
+                    )
+            else:
+                raise ValueError(
+                    f'Invalid timedelta string {s!r}; expected format like '
+                    '"30s" or "5m".',
+                )
         if isinstance(s, timedelta):
             return schedule(s, relative, app=app)
         else:
