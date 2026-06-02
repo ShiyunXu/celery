@@ -447,6 +447,21 @@ class test_chain(CanvasCase):
         assert all(isinstance(task, Signature) for task in deserialized.tasks)
         assert isinstance(deserialized, chain_type)
 
+    @pytest.mark.parametrize("chain_type", [_chain, chain_subclass])
+    def test_from_dict_preserves_immutable_and_subtask_options(self, chain_type):
+        c = chain_type(
+            self.add.s(1, 2).set(countdown=10, headers={"custom": "one"}),
+            self.add.si(3, 4).set(queue="test-q", headers={"custom": "two"}),
+        )
+        c.set_immutable(True)
+        serialized = json.loads(json.dumps(c))
+        deserialized = chain_type.from_dict(serialized)
+
+        assert deserialized.immutable is True
+        assert deserialized.tasks[0].options == c.tasks[0].options
+        assert deserialized.tasks[1].options == c.tasks[1].options
+        assert deserialized.tasks[1].immutable is True
+
     @pytest.mark.usefixtures('depends_on_current_app')
     def test_app_falls_back_to_default(self):
         from celery._state import current_app
