@@ -129,8 +129,8 @@ class Context:
         return headers
 
     def update(self, *args, **kwargs):
-        updates = {}
-        updates.update(*args, **kwargs)
+        updates = dict(*args, **kwargs)
+        old_timelimit = self.__dict__.get('timelimit', _UNSET)
 
         self.__dict__.update(updates)
 
@@ -140,8 +140,8 @@ class Context:
                 self.headers = {}
             self.headers.update(custom_headers)
 
-        new_timelimit = updates.get('timelimit', _UNSET)
-        if new_timelimit is not _UNSET:
+        new_timelimit = self.__dict__.get('timelimit', _UNSET)
+        if new_timelimit is not old_timelimit:
             if isinstance(new_timelimit, (list, tuple)) and len(new_timelimit) >= 2:
                 self.time_limit, self.soft_time_limit = new_timelimit[0], new_timelimit[1]
             else:
