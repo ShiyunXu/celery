@@ -236,7 +236,7 @@ class PendingConfiguration(UserDict, AttributeDictMixin):
                 expires_at = maybe_make_aware(isoparse(value))
             except (TypeError, ValueError):
                 return value
-            expires_in = expires_at - to_utc(datetime.now(datetime_timezone.utc))
+            expires_in = expires_at - datetime.now(datetime_timezone.utc)
             return max(expires_in, timedelta(0))
         return value
 
