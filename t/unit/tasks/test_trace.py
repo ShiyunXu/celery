@@ -1207,6 +1207,34 @@ class test_TraceInfo(TraceCase):
         x.handle_reject(self.add, req)
         x._log_error.assert_called_with(self.add, req, ExceptionInfo())
 
+    @patch('celery.app.trace.get_pickleable_etype')
+    @patch('celery.app.trace.get_pickleable_exception')
+    def test_handle_failure_when_pickleable_helpers_fail(
+        self, get_pickleable_exception, get_pickleable_etype,
+    ):
+        get_pickleable_exception.side_effect = TypeError('boom')
+        get_pickleable_etype.side_effect = TypeError('boom')
+
+        task = Mock(name='task')
+        task.backend.mark_as_failure = Mock()
+        task.on_failure = Mock()
+
+        req = Mock(name='req')
+        req.id = 'id-1'
+        req.args = ()
+        req.kwargs = {}
+
+        try:
+            raise ValueError('bad payload')
+        except ValueError as err:
+            x = self.TI(states.FAILURE, err)
+            x._log_error = Mock(name='log_error')
+            x.handle_failure(task, req)
+
+        stored_exc = task.backend.mark_as_failure.call_args.args[1]
+        assert isinstance(stored_exc, Exception)
+        assert get_pickleable_etype.called
+
 
 class test_stackprotection:
     def test_stackprotection(self):

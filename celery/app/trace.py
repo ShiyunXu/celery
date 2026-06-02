@@ -245,14 +245,28 @@ class TraceInfo:
         tb_ref = None
 
         try:
-            exc = get_pickleable_exception(orig_exc)
+            try:
+                exc = get_pickleable_exception(orig_exc)
+            except Exception:
+                logger.debug(
+                    'Failed to get pickleable exception; using safe representation.',
+                    exc_info=True,
+                )
+                exc = Exception(f'{type(orig_exc).__name__}: {safe_repr(orig_exc)}')
             if exc.__traceback__ is None:
                 # `get_pickleable_exception` may have created a new exception without
                 # a traceback.
                 _, _, tb_ref = sys.exc_info()
                 exc.__traceback__ = tb_ref
 
-            exc_type = get_pickleable_etype(type(orig_exc))
+            try:
+                exc_type = get_pickleable_etype(type(orig_exc))
+            except Exception:
+                logger.debug(
+                    'Failed to get pickleable exception type; defaulting to Exception.',
+                    exc_info=True,
+                )
+                exc_type = Exception
 
             # make sure we only send pickleable exceptions back to parent.
             einfo = ExceptionInfo(exc_info=(exc_type, exc, exc.__traceback__))

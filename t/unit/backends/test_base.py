@@ -39,6 +39,13 @@ class objectexception:
         pass
 
 
+class inaccessibleargsexception(Exception):
+    def __getattribute__(self, name):
+        if name == 'args':
+            raise TypeError('args unavailable')
+        return super().__getattribute__(name)
+
+
 Oldstyle = None
 
 Unpickleable = subclass_exception(
@@ -351,6 +358,15 @@ class test_prepare_exception:
         assert x == {'exc_message': (message,),
                      'exc_type': Exception.__name__,
                      'exc_module': Exception.__module__}
+
+    def test_encode_result_when_exception_args_are_inaccessible(self):
+        self.b.serializer = 'json'
+        x = self.b.encode_result(
+            inaccessibleargsexception('boom'),
+            states.FAILURE,
+        )
+        assert x['exc_type'] == Exception.__name__
+        assert x['exc_module'] == Exception.__module__
 
 
 class KVBackend(KeyValueStoreBackend):

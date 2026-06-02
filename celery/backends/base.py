@@ -16,7 +16,7 @@ from weakref import WeakValueDictionary
 from billiard.einfo import ExceptionInfo
 from kombu.serialization import dumps, loads, prepare_accept_content
 from kombu.serialization import registry as serializer_registry
-from kombu.utils.encoding import bytes_to_str, ensure_bytes
+from kombu.utils.encoding import bytes_to_str, ensure_bytes, safe_repr
 from kombu.utils.url import maybe_sanitize_url
 
 import celery.exceptions
@@ -556,7 +556,15 @@ class Backend:
 
     def encode_result(self, result, state):
         if state in self.EXCEPTION_STATES and isinstance(result, Exception):
-            return self.prepare_exception(result)
+            try:
+                return self.prepare_exception(result)
+            except Exception:
+                logger.debug(
+                    'Failed to prepare exception for result backend; storing safe representation instead.',
+                    exc_info=True,
+                )
+                safe_exc = Exception(f'{type(result).__name__}: {safe_repr(result)}')
+                return self.prepare_exception(safe_exc)
         return self.prepare_value(result)
 
     def is_cached(self, task_id):
