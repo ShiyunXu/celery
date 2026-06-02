@@ -713,7 +713,11 @@ class crontab(BaseSchedule):
 def maybe_schedule(
         s: int | float | str | timedelta | BaseSchedule, relative: bool = False,
         app: Celery | None = None) -> float | timedelta | BaseSchedule:
-    """Return schedule from number, timedelta, timedelta string, or schedule."""
+    """Return schedule from number, timedelta, timedelta string, or schedule.
+
+    Timedelta strings must look like ``"30s"``, ``"5m"``, ``"2.5h"``,
+    or ``"1d"``.
+    """
     if s is not None:
         if isinstance(s, (float, int)):
             s = timedelta(seconds=s)
@@ -722,7 +726,8 @@ def maybe_schedule(
             if not match:
                 raise ValueError(
                     f'Invalid timedelta string {s!r}; expected format like '
-                    '"30s" or "5m".',
+                    '"30s", "5m", "2.5h", or "1d" '
+                    '(s=seconds, m=minutes, h=hours, d=days).',
                 )
             s = timedelta(**{
                 _TIMEDELTA_UNITS[match.group('unit')]: float(match.group('value')),
