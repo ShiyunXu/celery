@@ -212,13 +212,16 @@ class test_RedisResultConsumer:
     def test_on_after_fork(self, parent_method):
         consumer = self.get_consumer()
         consumer.start('none')
+        old_pubsub = consumer._pubsub
         consumer.on_after_fork()
         parent_method.assert_called_once()
         consumer.backend.client.connection_pool.reset.assert_called_once()
-        consumer._pubsub.close.assert_called_once()
+        old_pubsub.close.assert_called_once()
+        # _pubsub is nulled out and subscriptions cleared after fork
+        assert consumer._pubsub is None
+        assert consumer.subscribed_to == set()
         # PubSub instance not initialized - exception would be raised
         # when calling .close()
-        consumer._pubsub = None
         parent_method.reset_mock()
         consumer.backend.client.connection_pool.reset.reset_mock()
         consumer.on_after_fork()
@@ -232,6 +235,8 @@ class test_RedisResultConsumer:
         consumer.backend.client.connection_pool.reset.reset_mock()
         consumer.on_after_fork()
         parent_method.assert_called_once()
+        assert consumer._pubsub is None
+        assert consumer.subscribed_to == set()
 
     @patch('celery.backends.redis.ResultConsumer.cancel_for')
     @patch('celery.backends.asynchronous.BaseResultConsumer.on_state_change')
@@ -348,6 +353,38 @@ class test_RedisResultConsumer:
 
         # Must not raise TypeError about a missing 'command_name' argument.
         consumer._reconnect_pubsub()
+
+    def test__reconnect_pubsub_closes_old_pubsub(self):
+        """Old pubsub must be closed before a new one is created on reconnect.
+
+        Without this, each reconnect leaks a pubsub subscription: redis-py
+        may transparently reconnect the old PubSub object, leaving multiple
+        active subscriptions for the same channels and causing duplicate
+        message delivery.
+        """
+        consumer = self.get_consumer()
+        consumer.start('initial')
+        old_pubsub = consumer._pubsub
+
+        consumer._reconnect_pubsub()
+
+        # The pre-reconnect pubsub must be explicitly closed.
+        old_pubsub.close.assert_called_once()
+        # A fresh pubsub object must be created after closing the old one.
+        assert consumer._pubsub is not old_pubsub
+
+    def test__reconnect_pubsub_closes_old_pubsub_even_when_close_raises(self):
+        """_reconnect_pubsub must proceed even if old pubsub.close() raises."""
+        consumer = self.get_consumer()
+        consumer.start('initial')
+        old_pubsub = consumer._pubsub
+        old_pubsub.close.side_effect = Exception('close failed')
+
+        # Must not raise — the error is swallowed so reconnect can continue.
+        consumer._reconnect_pubsub()
+
+        old_pubsub.close.assert_called_once()
+        assert consumer._pubsub is not old_pubsub
 
 
 class basetest_RedisBackend:
