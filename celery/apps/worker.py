@@ -60,6 +60,7 @@ BANNER = """\
 .> results:     {results}
 .> concurrency: {concurrency}
 .> task events: {events}
+.> mingle:      {mingle}
 
 [queues]
 {queues}
@@ -228,6 +229,22 @@ class Worker(WorkController):
         events = 'ON'
         if not self.task_events:
             events = 'OFF (enable -E to monitor tasks in this worker)'
+        mingle = 'ON'
+        mingle_step = None
+        consumer = getattr(self, 'consumer', None)
+        if consumer and getattr(consumer, 'blueprint', None):
+            mingle_step = next(
+                (step for step in consumer.blueprint.steps.values()
+                 if step.alias == 'Mingle'),
+                None,
+            )
+        if mingle_step is not None and not mingle_step.enabled:
+            if mingle_step.disabled_reason == 'by configuration':
+                mingle = 'OFF (disabled by --without-mingle)'
+            elif mingle_step.disabled_reason == 'by transport':
+                mingle = 'OFF (not supported by transport)'
+            else:
+                mingle = 'OFF'
 
         banner = BANNER.format(
             app=appr,
@@ -239,6 +256,7 @@ class Worker(WorkController):
             concurrency=concurrency,
             platform=safe_str(_platform.platform()),
             events=events,
+            mingle=mingle,
             queues=app.amqp.queues.format(indent=0, indent_first=False),
         ).splitlines()
 

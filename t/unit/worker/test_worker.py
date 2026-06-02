@@ -19,6 +19,7 @@ from kombu.transport.memory import Transport
 from kombu.utils.uuid import uuid
 
 import t.skip
+from celery.apps.worker import Worker as WorkerApp
 from celery.apps.worker import safe_say
 from celery.bootsteps import CLOSE, RUN, TERMINATE, StartStopStep
 from celery.concurrency.base import BasePool
@@ -1269,3 +1270,11 @@ class test_WorkerApp:
             assert "\ntest message\n" == captured.err
         finally:
             os.write = original_write
+
+    def test_startup_info_mingle_off_when_without_mingle(self):
+        worker = WorkerApp(
+            app=self.app, quiet=True, without_mingle=True,
+            without_gossip=True, without_heartbeat=True,
+            pool='solo', concurrency=1,
+        )
+        assert '.> mingle:      OFF (disabled by --without-mingle)' in worker.startup_info(artlines=False)
