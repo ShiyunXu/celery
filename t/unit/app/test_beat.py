@@ -242,6 +242,13 @@ class test_Scheduler:
         foo.apply_async.assert_called()
         assert foo.apply_async.call_args[0][0] == [101]
 
+    def test_apply_async_with_missing_task_name(self):
+        scheduler = mScheduler(app=self.app)
+        entry = scheduler.Entry(name='bad-entry', task=None, app=self.app)
+
+        with pytest.raises(beat.SchedulingError, match='Schedule entry has no task name'):
+            scheduler.apply_async(entry, advance=False)
+
     def test_should_sync(self):
 
         @self.app.task(shared=False)
@@ -328,6 +335,17 @@ class test_Scheduler:
                 mock_apply_async.return_value = self.app.AsyncResult(task_id)
                 s.apply_entry(entry)
         mock_debug.assert_called_once_with('%s sent. id->%s', entry.task, task_id)
+
+    @patch('celery.beat.error')
+    def test_apply_entry_with_missing_task_name(self, error):
+        scheduler = mScheduler(app=self.app)
+        entry = scheduler.Entry(name='bad-entry', task=None, app=self.app)
+
+        scheduler.apply_entry(entry)
+
+        assert not scheduler.sent
+        assert error.called
+        assert 'Schedule entry has no task name' in str(error.call_args[0][1])
 
     def test_maybe_entry(self):
         s = mScheduler(app=self.app)
