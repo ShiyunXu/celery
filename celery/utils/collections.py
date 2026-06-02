@@ -298,10 +298,11 @@ class ChainMap(MutableMapping):
 
     def update(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
-        result = self.changes.update(*args, **kwargs)
+        for key, value in dict(*args, **kwargs).items():
+            self[key] = value
         for callback in self._observers:
             callback(*args, **kwargs)
-        return result
+        return None
 
     def __repr__(self):
         # type: () -> str
