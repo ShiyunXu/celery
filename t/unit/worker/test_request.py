@@ -8,6 +8,7 @@ from unittest.mock import ANY, Mock, patch
 
 import pytest
 from billiard.einfo import ExceptionInfo
+from kombu.exceptions import DecodeError
 from kombu.utils.encoding import from_utf8, safe_repr, safe_str
 from kombu.utils.uuid import uuid
 
@@ -1468,6 +1469,27 @@ class test_Request(RequestCase):
         )
         with pytest.raises(KeyError):
             Request(m, app=self.app)
+
+    def test_from_message_legacy_bytes_payload(self):
+        tid = uuid()
+
+        class LegacyBytesMessage:
+            headers = {'id': tid, 'task': self.mytask.name}
+            body = b'\x80legacy-payload'
+            content_type = 'application/x-python-serialize'
+            content_encoding = 'binary'
+            delivery_info = {}
+            properties = {}
+
+            @property
+            def payload(self):
+                raise DecodeError('legacy payload decode failure')
+
+        job = Request(LegacyBytesMessage(), app=self.app)
+
+        assert job.id == tid
+        assert job.args == ()
+        assert job.kwargs == {}
 
     def test_execute(self):
         tid = uuid()

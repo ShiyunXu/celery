@@ -724,6 +724,16 @@ class Consumer:
         callbacks = self.on_task_message
         call_soon_ack = self.call_soon_ack
 
+        class _BodyBytesCompatMessage:
+            """Proxy with a minimal decoded payload for legacy raw-bytes bodies."""
+            payload = ((), {}, None)
+
+            def __init__(self, message):
+                self._message = message
+
+            def __getattr__(self, name):
+                return getattr(self._message, name)
+
         def on_task_received(message):
             # payload will only be set for v1 protocol, since v2
             # will defer deserializing the message body to the pool.
@@ -777,6 +787,19 @@ class Consumer:
                 except (InvalidTaskError, ContentDisallowed) as exc:
                     return on_invalid_task(payload, message, exc)
                 except DecodeError as exc:
+                    if payload is None and isinstance(message.body, (bytes, bytearray, memoryview)):
+                        try:
+                            strategy(
+                                _BodyBytesCompatMessage(message), payload,
+                                ack_log_error_promise,
+                                reject_log_error_promise,
+                                callbacks,
+                            )
+                            return
+                        except (InvalidTaskError, ContentDisallowed) as retry_exc:
+                            return on_invalid_task(payload, message, retry_exc)
+                        except DecodeError:
+                            pass
                     return self.on_decode_error(message, exc)
 
         return on_task_received

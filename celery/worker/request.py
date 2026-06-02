@@ -11,6 +11,7 @@ from weakref import ref
 
 from billiard.common import TERM_SIGNAME
 from billiard.einfo import ExceptionInfo, ExceptionWithTraceback
+from kombu.exceptions import DecodeError
 from kombu.utils.encoding import safe_repr, safe_str
 from kombu.utils.objects import cached_property
 
@@ -107,7 +108,20 @@ class Request:
             self._content_type, self._content_encoding = (
                 message.content_type, message.content_encoding,
             )
-        self.__payload = self._body if self._decoded else message.payload
+        if self._decoded:
+            self.__payload = self._body
+        else:
+            body_is_bytes = isinstance(self._body, (bytes, bytearray, memoryview))
+            try:
+                payload = message.payload
+            except DecodeError:
+                if body_is_bytes:
+                    payload = ((), {}, None)
+                else:
+                    raise
+            if body_is_bytes and not isinstance(payload, (tuple, list)):
+                payload = ((), {}, None)
+            self.__payload = payload
         self.id = self._request_dict['id']
         self._type = self.name = self._request_dict['task']
         if 'shadow' in self._request_dict:
