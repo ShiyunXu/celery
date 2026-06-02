@@ -435,6 +435,7 @@ class test_AsyncResult:
     def test_then_when_result_already_ready(self):
         backend = Mock()
         backend.is_async = True
+        backend.is_cached = Mock(return_value=True)
         backend.meta_from_decoded = Mock(side_effect=lambda meta: meta)
         backend.get_task_meta = Mock(return_value={
             "status": states.SUCCESS,
@@ -448,6 +449,7 @@ class test_AsyncResult:
         result.then(callback)
 
         backend.add_pending_result.assert_called_once_with(result, weak=False)
+        backend.is_cached.assert_called_once_with(result.id)
         backend.get_task_meta.assert_called_once_with(result.id)
         callback.assert_called_once_with(result)
 
