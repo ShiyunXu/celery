@@ -115,6 +115,9 @@ class Context:
 
     def __init__(self, *args, **kwargs):
         self.update(*args, **kwargs)
+        self._update_custom_headers(*args, **kwargs)
+
+    def _update_custom_headers(self, *args, **kwargs):
         if self.headers is None:
             self.headers = self._get_custom_headers(*args, **kwargs)
 
@@ -136,7 +139,9 @@ class Context:
         # sufficient — no need to pre-scan the arguments.
         old_timelimit = self.__dict__.get('timelimit', _UNSET)
 
-        self.__dict__.update(*args, **kwargs)
+        updates = {}
+        updates.update(*args, **kwargs)
+        self.__dict__.update(updates)
 
         new_timelimit = self.__dict__.get('timelimit', _UNSET)
         if new_timelimit is not old_timelimit:
@@ -147,6 +152,9 @@ class Context:
                 # provided but is None or otherwise invalid.
                 self.time_limit = None
                 self.soft_time_limit = None
+
+        if 'task' in updates or 'headers' in updates:
+            self._update_custom_headers(updates)
 
     def clear(self):
         return self.__dict__.clear()
