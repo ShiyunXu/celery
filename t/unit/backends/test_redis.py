@@ -1070,6 +1070,13 @@ class test_RedisBackend(basetest_RedisBackend):
         assert callback_task_id == task_id
         assert meta['task_id'] == task_id
         assert meta['status'] == state
+        if state == states.SUCCESS:
+            assert meta['result'] == 42
+        elif state == states.FAILURE:
+            assert meta['result']['exc_type'] == 'RuntimeError'
+            assert meta['traceback'] == 'tb'
+        else:
+            assert meta['result']['exc_type'] == 'TaskRevokedError'
 
     def test_result_store_callback_not_called_for_non_ready_states(self):
         callback = Mock()

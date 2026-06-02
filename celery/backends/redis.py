@@ -537,11 +537,11 @@ class RedisBackend(BaseKeyValueStoreBackend, AsyncBackendMixin):
         if self.result_store_callback is None or state not in states.READY_STATES:
             return None
         try:
-            self.result_store_callback(meta['task_id'], meta)
+            self.result_store_callback(task_id, meta)
         except Exception:  # pragma: no cover
             logger.exception(
                 'Redis result_store_callback raised for task %s',
-                meta['task_id'],
+                task_id,
             )
         return None
 
