@@ -453,6 +453,21 @@ class test_AsyncResult:
         backend.get_task_meta.assert_called_once_with(result.id)
         callback.assert_called_once_with(result)
 
+    def test_then_when_result_cached_on_instance(self):
+        backend = Mock()
+        backend.is_async = True
+        backend.is_cached = Mock(return_value=False)
+        result = self.app.AsyncResult(uuid(), backend=backend)
+        result._cache = {"status": states.SUCCESS, "result": "done"}
+        callback = Mock()
+
+        result.then(callback)
+
+        backend.add_pending_result.assert_called_once_with(result, weak=False)
+        backend.is_cached.assert_not_called()
+        backend.get_task_meta.assert_not_called()
+        callback.assert_called_once_with(result)
+
     def test_get_request_meta(self):
 
         x = self.app.AsyncResult('1')
