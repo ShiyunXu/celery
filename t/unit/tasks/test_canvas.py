@@ -891,6 +891,49 @@ class test_chain(CanvasCase):
         assert signature(flat_chain.tasks[1].options['link'][0]) == signature('link_b')
         assert signature(flat_chain.tasks[1].options['link_error'][0]) == signature('link_ab')
 
+    def test_chain_flattening_propagates_options_of_inner_chain(self):
+        """Options (e.g. queue, countdown) set on a nested chain must be
+        inherited by its constituent tasks when the chain is flattened.
+        Task-level options always take precedence over chain-level options."""
+        inner_chain = chain(signature('a'), signature('b').set(queue='task_queue'))
+        inner_chain.set(queue='chain_queue', countdown=30)
+
+        flat_chain = chain(inner_chain, signature('c'))
+
+        # task 'a' has no explicit queue, so it inherits 'chain_queue'
+        assert flat_chain.tasks[0].options.get('queue') == 'chain_queue'
+        assert flat_chain.tasks[0].options.get('countdown') == 30
+        # task 'b' already has queue='task_queue', which wins over chain_queue
+        assert flat_chain.tasks[1].options.get('queue') == 'task_queue'
+        assert flat_chain.tasks[1].options.get('countdown') == 30
+        # task 'c' is outside the inner chain, it gets no inherited options
+        assert flat_chain.tasks[2].options.get('queue') is None
+        assert flat_chain.tasks[2].options.get('countdown') is None
+
+    def test_prepare_steps_propagates_nested_chain_options(self):
+        """Options set on a nested _chain must propagate to its inner tasks
+        when prepare_steps splices the chain into the parent chain."""
+        inner_chain = _chain(
+            self.add.s(1, 1), self.add.s(2), app=self.app
+        )
+        inner_chain.set(queue='nested_queue', countdown=5)
+
+        outer_chain = _chain(inner_chain, self.add.s(3), app=self.app)
+        outer_chain.freeze()
+
+        # prepare_steps stores tasks in reverse execution order, so
+        # tasks[0] is the last task (add.s(3)), tasks[1] and tasks[2]
+        # are the inner-chain tasks.
+        tasks, _ = outer_chain._frozen
+        # tasks from the inner chain (indices 1 and 2) should have inherited options
+        assert tasks[1].options.get('queue') == 'nested_queue'
+        assert tasks[1].options.get('countdown') == 5
+        assert tasks[2].options.get('queue') == 'nested_queue'
+        assert tasks[2].options.get('countdown') == 5
+        # The task outside the inner chain (index 0) should be unaffected
+        assert tasks[0].options.get('queue') is None
+        assert tasks[0].options.get('countdown') is None
+
     def test_group_in_center_of_chain(self):
         t1 = chain(self.add.si(1, 1), group(self.add.si(1, 1), self.add.si(1, 1)),
                    self.add.si(1, 1) | self.add.si(1, 1))
@@ -1041,6 +1084,24 @@ class test_group(CanvasCase):
         g1 = group(self.add.s(2, 2), self.add.s(4, 4), app=self.app)
         g2 = group(g1, app=self.app)
         assert g2.tasks is g1.tasks
+
+    def test_clone_creates_independent_tasks(self):
+        """Cloning a group must produce independent copies of its inner tasks
+        so that mutating the clone does not affect the original group."""
+        t1 = self.add.s(1, 1)
+        t2 = self.add.s(2, 2)
+        original = group([t1, t2], app=self.app)
+        cloned = original.clone()
+
+        # Inner tasks must be independent objects (not the same references)
+        orig_tasks = list(original.tasks)
+        cloned_tasks = list(cloned.tasks)
+        assert cloned_tasks[0] is not orig_tasks[0]
+        assert cloned_tasks[1] is not orig_tasks[1]
+
+        # Mutating the clone's task options must not affect the original
+        cloned_tasks[0].set(queue='new_queue')
+        assert orig_tasks[0].options.get('queue') is None
 
     def test_maybe_group_sig(self):
         assert _maybe_group(self.add.s(2, 2), self.app) == [self.add.s(2, 2)]
@@ -1723,21 +1784,22 @@ class test_chord(CanvasCase):
         # We also expect the body to have no initial options - since all of the
         # embedded body elements are confirmed to be `body_elem` this is valid
         assert body_elem.options == {}
-        # When we freeze the chord, its body will be cloned and options set
+        # When we freeze the group, chord tasks will be cloned and body options set
         top_group.freeze()
         with subtests.test(
             msg="Validate body group indices count from 0 after freezing"
         ):
-            assert isinstance(chord_obj.body, group_type)
-
-            assert all(
-                embedded_body_elem is not body_elem
-                for embedded_body_elem in chord_obj.body.tasks
-            )
-            assert all(
-                embedded_body_elem.options["group_index"] == i
-                for i, embedded_body_elem in enumerate(chord_obj.body.tasks)
-            )
+            for frozen_task in top_group.tasks:
+                assert isinstance(frozen_task, chord)
+                assert isinstance(frozen_task.body, group_type)
+                assert all(
+                    embedded_body_elem is not body_elem
+                    for embedded_body_elem in frozen_task.body.tasks
+                )
+                assert all(
+                    embedded_body_elem.options["group_index"] == i
+                    for i, embedded_body_elem in enumerate(frozen_task.body.tasks)
+                )
 
     def test_freeze_tasks_is_not_group(self):
         x = chord([self.add.s(2, 2)], body=self.add.s(), app=self.app)

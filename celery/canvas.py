@@ -1022,10 +1022,22 @@ class _chain(Signature):
         All of the tasks would be linked to the same error callback
         as the chain itself, to ensure that the correct error callback is called
         if any of the (cloned) tasks of the chain fail.
+
+        Chain-level execution options (e.g. ``queue``, ``countdown``) are
+        propagated to each individual task as defaults; task-level options
+        always take precedence.
         """
         # Clone chain's tasks assigning signatures from link_error
         # to each task and adding the chain's links to the last task.
         tasks = [t.clone() for t in self.tasks]
+        # Propagate chain-level options to individual tasks as defaults.
+        # link/link_error are handled separately below; all other options
+        # (queue, countdown, routing_key, …) are applied to each task only
+        # when the task does not already define that option itself.
+        for k, v in self.options.items():
+            if k not in ('link', 'link_error'):
+                for task in tasks:
+                    task.options.setdefault(k, v)
         for sig in maybe_list(self.options.get('link')) or []:
             tasks[-1].link(sig)
         for sig in maybe_list(self.options.get('link_error')) or []:
@@ -1208,8 +1220,21 @@ class _chain(Signature):
                 task.args = tuple(args) + tuple(task.args)
 
             if isinstance(task, _chain):
-                # splice (unroll) the chain
-                steps_extend(task.tasks)
+                # splice (unroll) the chain, propagating chain-level options
+                # (e.g. queue, countdown) to the inner tasks as defaults so
+                # that task-level options always take precedence.
+                inner_tasks = list(task.tasks)
+                for k, v in task.options.items():
+                    if k not in ('link', 'link_error'):
+                        for t in inner_tasks:
+                            t.options.setdefault(k, v)
+                for sig in maybe_list(task.options.get('link')) or []:
+                    if inner_tasks:
+                        inner_tasks[-1].link(sig)
+                for sig in maybe_list(task.options.get('link_error')) or []:
+                    for t in inner_tasks:
+                        t.link_error(sig)
+                steps_extend(inner_tasks)
                 continue
 
             # TODO why isn't this asserting is_last_task == False?
@@ -1594,6 +1619,16 @@ class group(Signature):
 
     def __call__(self, *partial_args, **options):
         return self.apply_async(partial_args, **options)
+
+    def clone(self, *args, **kwargs):
+        signature = super().clone(*args, **kwargs)
+        # Ensure each task inside the group is independently cloned so that
+        # the new group and the original do not share mutable task objects.
+        signature.kwargs['tasks'] = [
+            maybe_signature(sig, app=self._app, clone=True)
+            for sig in signature.kwargs['tasks']
+        ]
+        return signature
 
     def __or__(self, other):
         if (
