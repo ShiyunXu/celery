@@ -129,6 +129,8 @@ class Context:
         return headers
 
     def update(self, *args, **kwargs):
+        custom_headers = self._get_custom_headers(*args, **kwargs)
+
         # O(1) detection: snapshot the current timelimit identity before the
         # update, then compare after.  Any input form that dict.update()
         # accepts (Mapping, iterable of pairs, kwargs) will change the stored
@@ -147,6 +149,11 @@ class Context:
                 # provided but is None or otherwise invalid.
                 self.time_limit = None
                 self.soft_time_limit = None
+
+        if custom_headers:
+            if self.headers is None:
+                self.headers = {}
+            self.headers.update(custom_headers)
 
     def clear(self):
         return self.__dict__.clear()
