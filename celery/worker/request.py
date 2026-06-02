@@ -107,7 +107,22 @@ class Request:
             self._content_type, self._content_encoding = (
                 message.content_type, message.content_encoding,
             )
-        self.__payload = self._body if self._decoded else message.payload
+        if self._decoded:
+            self.__payload = self._body
+        else:
+            try:
+                payload = message.payload
+            except Exception:  # pragma: no cover
+                if isinstance(self._body, (bytes, bytearray, memoryview)):
+                    payload = ((), {}, None)
+                else:
+                    raise
+            if (
+                isinstance(self._body, (bytes, bytearray, memoryview))
+                and not isinstance(payload, (tuple, list))
+            ):
+                payload = ((), {}, None)
+            self.__payload = payload
         self.id = self._request_dict['id']
         self._type = self.name = self._request_dict['task']
         if 'shadow' in self._request_dict:

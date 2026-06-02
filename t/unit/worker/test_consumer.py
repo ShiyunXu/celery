@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, Mock, call, patch
 import pytest
 from amqp import ChannelError
 from billiard.exceptions import RestartFreqExceeded
+from kombu.exceptions import DecodeError
 
 from celery import bootsteps
 from celery.contrib.testing.mocks import ContextMock
@@ -286,6 +287,27 @@ class test_Consumer(ConsumerTestCase):
 
         with subtests.test("maximum prefetch is reached"):
             assert c._maximum_prefetch_restored is True
+
+    def test_create_task_handler_retries_legacy_bytes_body(self):
+        c = self.get_consumer()
+        c.on_decode_error = Mock()
+        message = self.TaskMessage(self.add.name)
+        message.body = b'\x80legacy-payload'
+        strategy_calls = []
+
+        def strategy(msg, *_):
+            strategy_calls.append(msg)
+            if len(strategy_calls) == 1:
+                raise DecodeError('legacy bytes decode failure')
+            assert msg.payload == ((), {}, None)
+
+        c.strategies[self.add.name] = strategy
+        on_task_received = c.create_task_handler()
+
+        on_task_received(message)
+
+        assert len(strategy_calls) == 2
+        c.on_decode_error.assert_not_called()
 
     def test_flush_events(self):
         c = self.get_consumer()
