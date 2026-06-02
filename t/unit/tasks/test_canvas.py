@@ -815,6 +815,27 @@ class test_chain(CanvasCase):
             seen.add(node.id)
             node = node.parent
 
+    def test_nested_chain_group_result_parent_order_is_stable(self):
+        c = (
+            self.add.s(0, 0) |
+            group(self.add.s(1, 1), self.add.s(2, 2)) |
+            (self.add.s(3, 3) | self.add.s(4, 4))
+        )
+        res = c.freeze()
+
+        assert isinstance(res, AsyncResult)
+        assert isinstance(res.parent, AsyncResult)
+        assert isinstance(res.parent.parent, GroupResult)
+        assert isinstance(res.parent.parent.parent, AsyncResult)
+        assert res.parent.parent.parent.parent is None
+
+        seen = set()
+        node = res
+        while node:
+            assert node.id not in seen
+            seen.add(node.id)
+            node = node.parent
+
     def test_append_to_empty_chain(self):
         x = chain()
         x |= self.add.s(1, 1)

@@ -1261,7 +1261,10 @@ class _chain(Signature):
                     # link previous task to this task.
                     task.link(prev_task)
 
-                if prev_res and not prev_res.parent:
+                if prev_res and (
+                    not prev_res.parent or
+                    prev_res.parent.id == res.id
+                ):
                     prev_res.parent = res
 
             if link_error:
